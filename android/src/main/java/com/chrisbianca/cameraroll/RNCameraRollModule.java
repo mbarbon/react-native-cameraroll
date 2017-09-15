@@ -46,6 +46,11 @@ public class RNCameraRollModule extends ReactContextBaseJavaModule {
         Images.Media.DISPLAY_NAME
     };
 
+    private static final String[] VIDEO_THUMB_FIELDS = {
+        MediaStore.Video.Thumbnails.DATA,
+        MediaStore.Video.Thumbnails.VIDEO_ID
+    };
+
     private static final String QUERY_DATE_TAKEN = Images.Media.DATE_TAKEN + " < ?";
 
     public RNCameraRollModule(ReactApplicationContext reactContext) {
@@ -134,7 +139,7 @@ public class RNCameraRollModule extends ReactContextBaseJavaModule {
                     mPromise.reject(ERROR_UNABLE_TO_LOAD, "Could not get assets");
                 } else {
                     try {
-                        response.putArray("assets", buildAssets(assetsCursor, response, mLimit));
+                        response.putArray("assets", buildAssets(resolver, assetsCursor, response, mLimit));
                         response.putMap("page_info", buildPageInfo(assetsCursor, response, mLimit));
                     } finally {
                         assetsCursor.close();
@@ -161,7 +166,7 @@ public class RNCameraRollModule extends ReactContextBaseJavaModule {
         return pageInfo;
     }
 
-    private static WritableArray buildAssets(Cursor assetsCursor, WritableMap response,
+    private static WritableArray buildAssets(ContentResolver resolver, Cursor assetsCursor, WritableMap response,
         int limit) {
         assetsCursor.moveToFirst();
         int idIndex = assetsCursor.getColumnIndex(Images.Media._ID);
@@ -188,10 +193,23 @@ public class RNCameraRollModule extends ReactContextBaseJavaModule {
                 asset.putString("uri", photoUri.toString());
                 asset.putString("type", "image");
             } else {
+                String videoId = assetsCursor.getString(idIndex);
                 Uri videoUri = Uri.withAppendedPath(MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
-                        assetsCursor.getString(idIndex));
+                        videoId);
                 asset.putString("uri", videoUri.toString());
                 asset.putString("type", "video");
+
+                Cursor thumbCursor = resolver.query(
+                    MediaStore.Video.Thumbnails.EXTERNAL_CONTENT_URI,
+                    VIDEO_THUMB_FIELDS,
+                    MediaStore.Video.Thumbnails.VIDEO_ID + "=" + videoId,
+                    null,
+                    null
+                );
+                if (thumbCursor.moveToFirst()) {
+                    int thumbIndex = thumbCursor.getColumnIndex(MediaStore.Video.Thumbnails.DATA);
+                    asset.putString("thumbUri", "file://" + thumbCursor.getString(thumbIndex));
+                }
             }
 
             double longitude = assetsCursor.getDouble(longitudeIndex);
