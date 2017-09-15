@@ -51,11 +51,13 @@ RCT_EXPORT_METHOD(getAssets:(NSDictionary *)params
   NSUInteger limitParam = [RCTConvert NSInteger:params[@"limit"]];
   NSString *assetTypeParam = [RCTConvert NSString:params[@"assetType"]];
 
-  PHAssetMediaType assetType;
+  NSPredicate *predicate;
   if ([assetTypeParam isEqualToString:@"image"]) {
-    assetType = PHAssetMediaTypeImage;
+    predicate = [NSPredicate predicateWithFormat:@"mediaType == %d", PHAssetMediaTypeImage];
   } else if ([assetTypeParam isEqualToString:@"video"]) {
-    assetType = PHAssetMediaTypeVideo;
+    predicate = [NSPredicate predicateWithFormat:@"mediaType == %d", PHAssetMediaTypeVideo];
+  } else if ([assetTypeParam isEqualToString:@"all"]) {
+    predicate = [NSPredicate predicateWithFormat:@"mediaType == %d OR mediaType == %d", PHAssetMediaTypeImage, PHAssetMediaTypeVideo];
   } else {
     RCTLogError(@"Invalid assetType %@", assetTypeParam);
     reject(RCTErrorInvalidAssetType, nil, nil);
@@ -63,9 +65,10 @@ RCT_EXPORT_METHOD(getAssets:(NSDictionary *)params
   }
 
   PHFetchOptions *allPhotosOptions = [PHFetchOptions new];
+  allPhotosOptions.predicate = predicate;
   allPhotosOptions.sortDescriptors = @[[NSSortDescriptor sortDescriptorWithKey:@"creationDate" ascending:NO]];
 
-  PHFetchResult *allPhotosResult = [PHAsset fetchAssetsWithMediaType:assetType options:allPhotosOptions];
+  PHFetchResult *allPhotosResult = [PHAsset fetchAssetsWithOptions:allPhotosOptions];
 
   NSInteger startIndex = startParam ? startParam : 0;
   NSInteger length = !limitParam || startIndex + limitParam > allPhotosResult.count ? allPhotosResult.count - startIndex : limitParam;
